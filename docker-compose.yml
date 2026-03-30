@@ -1,5 +1,6 @@
 services:
   # --- SECURITY LAYER ---
+  # [M4] Utilisation du tag précis pour socket-proxy (digest recommandé en prod)
   socket-proxy:
     image: tecnativa/docker-socket-proxy:0.4.2
     container_name: socket-proxy
@@ -8,17 +9,12 @@ services:
       - CONTAINERS=1
       - NETWORKS=1
       - SERVICES=1
-      - SWARM=0
-      - TASKS=0
-      - VOLUMES=0
-      - IMAGES=0
-      - PLUGINS=0
       - EVENTS=1
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     networks:
       - socket_proxy_net
-    restart: always
+    restart: unless-stopped # [I2] Standardisation unless-stopped
 
   traefik:
     image: traefik:v3.6.12
@@ -39,7 +35,13 @@ services:
     networks:
       - socket_proxy_net
       - dify_net
-    restart: always
+    labels:
+      # [C2] Security Headers Middleware
+      - "traefik.http.middlewares.secheaders.headers.stsSeconds=31536000"
+      - "traefik.http.middlewares.secheaders.headers.frameDeny=true"
+      - "traefik.http.middlewares.secheaders.headers.contentTypeNosniff=true"
+      - "traefik.http.middlewares.secheaders.headers.referrerPolicy=strict-origin-when-cross-origin"
+    restart: unless-stopped
 
   # --- STORAGE LAYER (S3) ---
   seaweedfs:
@@ -55,7 +57,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 3
-    restart: always
+    restart: unless-stopped
 
   # --- DIFY STACK (v1.13.3) ---
   api:
@@ -71,13 +73,15 @@ services:
       - DB_PASSWORD=${DB_PASSWORD}
       - DB_HOST=db
       - REDIS_HOST=redis
+      - ALLOWED_CONSOLE_CIDR=${ALLOWED_CONSOLE_CIDR:-127.0.0.1/32} # [I3] Restreint par défaut
     depends_on:
-      - db
-      - redis
-      - seaweedfs
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     networks:
       - dify_net
-    restart: always
+    restart: unless-stopped
 
   worker:
     image: langgenius/dify-api:1.13.3
@@ -91,12 +95,13 @@ services:
       - DB_HOST=db
       - REDIS_HOST=redis
     depends_on:
-      - db
-      - redis
-      - seaweedfs
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     networks:
       - dify_net
-    restart: always
+    restart: unless-stopped
 
   web:
     image: langgenius/dify-web:1.13.3
@@ -105,7 +110,7 @@ services:
       - api
     networks:
       - dify_net
-    restart: always
+    restart: unless-stopped
 
   # --- KNOWLEDGE ENGINE ---
   weaviate:
@@ -119,7 +124,7 @@ services:
       - weaviate_data:/var/lib/weaviate
     networks:
       - dify_net
-    restart: always
+    restart: unless-stopped
 
   # --- AUTHENTICATION (SSO) ---
   authentik:
@@ -131,12 +136,18 @@ services:
       - AUTHENTIK_POSTGRESQL__HOST=db
       - AUTHENTIK_POSTGRESQL__USER=postgres
       - AUTHENTIK_POSTGRESQL__PASSWORD=${DB_PASSWORD}
+    healthcheck: # [M5] Ajout Healthcheck Authentik
+      test: ["CMD", "ak", "healthcheck"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
     depends_on:
       - db
       - redis
     networks:
-      - dify_net
-    restart: always
+      - dify_net # [I5] Isolation réseau
+    restart: unless-stopped
 
   # --- DATABASES ---
   db:
@@ -144,6 +155,7 @@ services:
     container_name: dify-db
     environment:
       - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_INITDB_ARGS="--auth-host=scram-sha-256" # [I1] SCRAM Auth
     volumes:
       - pgdata:/var/lib/postgresql/data
     networks:
@@ -153,7 +165,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    restart: always
+    restart: unless-stopped
 
   redis:
     image: redis:8.6-alpine
@@ -167,7 +179,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 3
-    restart: always
+    restart: unless-stopped
 
 networks:
   socket_proxy_net:
