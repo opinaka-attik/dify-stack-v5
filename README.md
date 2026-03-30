@@ -1,38 +1,44 @@
-# Dify Stack v5 - Hardened & Verified
+# Dify Stack v5 - Full Hardened Solution
 
-Cette stack est une version sécurisée et mise à jour de Dify (v0.15.3), utilisant **SeaweedFS** comme alternative performante à MinIO.
+Cette stack est une version complète, sécurisée et optimisée de **Dify v1.13.3**, intégrant une architecture multi-couches pour la production.
 
-## 🚀 Caractéristiques
-- **Versions Vérifiées** : Toutes les images Docker utilisent des tags précis et récents (30/03/2026).
-- **Sécurité** : 
-  - Traefik configuré avec `no-new-privileges`.
-  - Headers HTTP sécurisés activés.
-  - Volumes en `read_only` là où c'est possible.
-- **Stockage** : Remplacement de MinIO par SeaweedFS (plus léger, compatible S3).
+## 🏗️ Architecture
+- **Reverse Proxy** : Traefik v3.6.12 avec Docker Socket Proxy pour une isolation maximale.
+- **SSO / Auth** : Authentik 2026.2.1 pour la gestion des accès.
+- **VDB / Knowledge** : Weaviate v1.36.8.
+- **Storage** : SeaweedFS v4.17 (Compatible S3, remplacement MinIO).
+- **Core** : Dify API, Worker & Web v1.13.3.
+- **Bases de données** : PostgreSQL 17 & Redis 8.6.
 
-## 🛠 Installation
+## 🚀 Caractéristiques de Sécurité
+- **Docker Socket Proxy** : Traefik n'accède pas directement au socket Docker.
+- **Hardening** : `no-new-privileges`, `read_only` sur les sockets, isolation réseau.
+- **Healthchecks** : Monitoring automatique de l'état des services.
 
-1. Clonez le repository :
+## 🛠️ Installation Quickstart
+
+1. **Cloner le projet** :
    ```bash
    git clone https://github.com/opinaka-attik/dify-stack-v5.git
    cd dify-stack-v5
    ```
 
-2. Configurez l'environnement :
+2. **Environnement** :
    ```bash
    cp .env.example .env
-   # Modifiez le SECRET_KEY dans le fichier .env
+   # Remplissez les clés secrètes et mots de passe
    ```
 
-3. Lancez la stack :
+3. **Lancement** :
    ```bash
    docker compose up -d
    ```
 
-## 📊 Services
-- **Dify Web UI** : `http://localhost`
+## 📊 Accès
+- **Dify UI** : `http://localhost`
+- **Authentik** : `http://localhost:9000`
+- **Traefik Dashboard** : `http://localhost:8080`
 - **SeaweedFS S3** : `http://localhost:8333`
-- **Traefik Dashboard** : `http://localhost:8080` (si activé)
 
-## 🔒 Sécurité
-Cette configuration suit les meilleures pratiques de hardening Docker. N'oubliez pas de changer les mots de passe par défaut dans le fichier `.env`.
+---
+*Dernière mise à jour : 30 Mars 2026*
